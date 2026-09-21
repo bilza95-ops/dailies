@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dailies overlay
 // @namespace    dailies.punchcard
-// @version      1.3
+// @version      1.4
 // @description  A Dailies bar on every puzzle site: go home, punch it done, jump to the next one.
 // @author       you
 // @run-at       document-idle
@@ -60,7 +60,9 @@
   var HOME = "https://bilza95-ops.github.io/dailies/";
 
   var KEY = "dailies.v1";
-  var HIDE_KEY = "dailies.barHidden";
+  var PREF_KEY = "dailies.barPrefs";
+  /* sites whose own controls sit where the bar would: start out of the way */
+  var PREF_DEFAULTS = { timeguessr: { hidden: true, pos: "top" } };
 
   function host(re) { return function (l) { return re.test(l.hostname); }; }
   var oct = /(^|\.)(merriam-webster\.com|britannica\.com|octordle\.com)$/;
@@ -221,6 +223,7 @@
       'background:#243A6B;color:#F1F2ED;border-radius:9px;overflow:hidden;' +
       'box-shadow:0 6px 22px rgba(0,0,0,.34);font-size:14px}' +
     '.bar.hidden{display:none}' +
+    '.bar.top{top:calc(10px + env(safe-area-inset-top,0px));bottom:auto}' +
     '.b{background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;display:flex;' +
       'align-items:center;justify-content:center;flex:0 0 auto;width:46px}' +
     '.b:active{background:rgba(255,255,255,.14)}' +
@@ -241,12 +244,15 @@
     '.tick.on .ck{stroke-dashoffset:0}' +
     '.next{border-left:1px solid rgba(255,255,255,.18);font-size:19px;font-weight:700}' +
     '.next[disabled]{opacity:.32}' +
+    '.move{width:30px;font-size:14px;color:#8FA0CC;border-left:1px solid rgba(255,255,255,.18)}' +
     '.x{width:30px;font-size:15px;color:#8FA0CC;border-left:1px solid rgba(255,255,255,.18)}' +
     '.badge{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));' +
       'width:40px;height:40px;border-radius:50%;background:#243A6B;color:#F1F2ED;border:0;' +
       'font-weight:800;font-size:16px;cursor:pointer;display:none;align-items:center;' +
       'justify-content:center;box-shadow:0 5px 16px rgba(0,0,0,.34)}' +
     '.badge.show{display:flex}' +
+    '.badge.top{top:calc(12px + env(safe-area-inset-top,0px));left:12px;right:auto;bottom:auto;' +
+      'width:34px;height:34px;font-size:14px;opacity:.9}' +
     '@media (prefers-reduced-motion:reduce){*{transition:none!important}}' +
     '</style>' +
     '<div class="bar" id="bar">' +
@@ -262,6 +268,7 @@
         'stroke-width="1.7"/><path class="ck" d="M7.5 12.4l3 3 6-6.4" stroke="currentColor" ' +
         'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
       '<button class="b next" id="next" title="Next puzzle">&rarr;</button>' +
+      '<button class="b move" id="move" title="Move to the other end">&#8597;</button>' +
       '<button class="b x" id="x" title="Hide">&times;</button>' +
     '</div>' +
     '<button class="badge" id="badge" title="Show Dailies">D</button>';
@@ -305,7 +312,34 @@
     setVal(KEY, state);
   }
 
+  var prefs = {};
+  function myPref() {
+    var d = PREF_DEFAULTS[game.id] || {};
+    var p = prefs[game.id] || {};
+    return {
+      hidden: p.hidden !== undefined ? p.hidden : (d.hidden || false),
+      pos: p.pos || d.pos || "bottom"
+    };
+  }
+  function setPref(patch) {
+    var cur = myPref();
+    prefs[game.id] = { hidden: patch.hidden !== undefined ? patch.hidden : cur.hidden,
+                       pos: patch.pos || cur.pos };
+    setVal(PREF_KEY, prefs);
+    applyPref();
+  }
+  function applyPref() {
+    var p = myPref(), top = p.pos === "top";
+    barEl.classList.toggle("top", top);
+    badgeEl.classList.toggle("top", top);
+    barEl.classList.toggle("hidden", p.hidden);
+    badgeEl.classList.toggle("show", p.hidden);
+  }
+
   $("home").addEventListener("click", function () { location.href = HOME; });
+  $("move").addEventListener("click", function () {
+    setPref({ pos: myPref().pos === "top" ? "bottom" : "top" });
+  });
   function mark(kind) {
     var mine = state[kind][game.id],
         other = state[kind === "done" ? "miss" : "done"][game.id],
@@ -321,16 +355,13 @@
   tickEl.addEventListener("click", function () { mark("done"); });
   failEl.addEventListener("click", function () { mark("miss"); });
   nextEl.addEventListener("click", function () { if (nextGame) location.href = nextGame.u; });
-  $("x").addEventListener("click", function () {
-    barEl.classList.add("hidden"); badgeEl.classList.add("show"); setVal(HIDE_KEY, true);
-  });
-  badgeEl.addEventListener("click", function () {
-    barEl.classList.remove("hidden"); badgeEl.classList.remove("show"); setVal(HIDE_KEY, false);
-  });
+  $("x").addEventListener("click", function () { setPref({ hidden: true }); });
+  badgeEl.addEventListener("click", function () { setPref({ hidden: false }); });
 
-  Promise.all([getVal(KEY, null), getVal(HIDE_KEY, false)]).then(function (r) {
+  Promise.all([getVal(KEY, null), getVal(PREF_KEY, null)]).then(function (r) {
     state = r[0] ? tidy(r[0]) : blank();
-    if (r[1]) { barEl.classList.add("hidden"); badgeEl.classList.add("show"); }
+    prefs = (r[1] && typeof r[1] === "object") ? r[1] : {};
+    applyPref();
     paint();
   });
 
