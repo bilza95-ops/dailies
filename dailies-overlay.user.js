@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dailies overlay
 // @namespace    dailies.punchcard
-// @version      1.2
+// @version      1.3
 // @description  A Dailies bar on every puzzle site: go home, punch it done, jump to the next one.
 // @author       you
 // @run-at       document-idle
@@ -21,6 +21,13 @@
 // @match        *://www.octordle.com/*
 // @match        *://www.britannica.com/games/*
 // @match        *://britannica.com/games/*
+// @match        *://www.merriam-webster.com/games/octordle/*
+// @match        *://merriam-webster.com/games/octordle/*
+// @match        *://micro.nerdlegame.com/*
+// @match        *://mini.nerdlegame.com/*
+// @match        *://midi.nerdlegame.com/*
+// @match        *://travle.earth/*
+// @match        *://www.travle.earth/*
 // @match        *://qntm.org/*
 // @match        *://wafflegame.net/*
 // @match        *://www.wafflegame.net/*
@@ -55,29 +62,48 @@
   var KEY = "dailies.v1";
   var HIDE_KEY = "dailies.barHidden";
 
+  function host(re) { return function (l) { return re.test(l.hostname); }; }
+  var oct = /(^|\.)(merriam-webster\.com|britannica\.com|octordle\.com)$/;
+  var xw  = /(^|\.)crosswordle\.com$/;
+  var sem = /(^|\.)semantle\.com$/;
+
   var GAMES = [
-    { id: "parseword",     n: "Parseword",      u: "https://www.parseword.com",       host: /(^|\.)parseword\.com$/ },
-    { id: "minutecryptic", n: "Minute Cryptic", u: "https://www.minutecryptic.com",   host: /(^|\.)minutecryptic\.com$/ },
-    { id: "octordle",      n: "Octordle",       u: "https://www.britannica.com/games/octordle/daily",
-      test: function (l) {
-        return /(^|\.)octordle\.com$/.test(l.hostname) ||
-               (/(^|\.)britannica\.com$/.test(l.hostname) && /octordle/i.test(l.pathname));
-      } },
-    { id: "absurdle",      n: "Absurdle",       u: "https://qntm.org/files/absurdle/absurdle.html", host: /(^|\.)qntm\.org$/, path: /absurdle/i },
-    { id: "waffle",        n: "Waffle",         u: "https://wafflegame.net",          host: /(^|\.)wafflegame\.net$/ },
-    { id: "squardle",      n: "Squardle",       u: "https://fubargames.se/squardle/", host: /(^|\.)fubargames\.se$/, path: /squardle/i },
-    { id: "crosswordle",   n: "Crosswordle",    u: "https://crosswordle.com",         host: /(^|\.)crosswordle\.com$/ },
-    { id: "semantle",      n: "Semantle",       u: "https://semantle.com",            host: /(^|\.)semantle\.com$/ },
-    { id: "hunch",         n: "Hunch",          u: "https://hunch.game",              host: /(^|\.)hunch\.game$/ },
-    { id: "tilbo",         n: "Tilbo",          u: "https://tilbo.fun",               host: /(^|\.)tilbo\.fun$/ },
-    { id: "cluesbysam",    n: "Clues By Sam",   u: "https://cluesbysam.com",          host: /(^|\.)cluesbysam\.com$/ },
-    { id: "spectra",       n: "Spectra",        u: "https://spectra.quest",           host: /(^|\.)spectra\.quest$/ },
-    { id: "nerdle",        n: "Nerdle",         u: "https://nerdlegame.com",          host: /(^|\.)nerdlegame\.com$/ },
-    { id: "framed",        n: "Framed",         u: "https://framed.wtf",              host: /(^|\.)framed\.wtf$/ },
-    { id: "bandle",        n: "Bandle",         u: "https://bandle.app",              host: /(^|\.)bandle\.app$/ },
-    { id: "travle",        n: "Travle",         u: "https://imois.in/games/travle",   host: /(^|\.)imois\.in$/, path: /travle/i },
-    { id: "timeguessr",    n: "TimeGuessr",     u: "https://timeguessr.com",          host: /(^|\.)timeguessr\.com$/ },
-    { id: "costcodle",     n: "Costcodle",      u: "https://costcodle.com",           host: /(^|\.)costcodle\.com$/ }
+    { id: "parseword",     n: "Parseword",          u: "https://www.parseword.com",     test: host(/(^|\.)parseword\.com$/) },
+    { id: "minutecryptic", n: "Minute Cryptic",     u: "https://www.minutecryptic.com", test: host(/(^|\.)minutecryptic\.com$/) },
+    { id: "octordle-chill",   n: "Octordle Chill",   u: "https://www.merriam-webster.com/games/octordle/daily-chill",
+      test: function (l) { return oct.test(l.hostname) && /daily-chill/.test(l.pathname); } },
+    { id: "octordle-extreme", n: "Octordle Extreme", u: "https://www.merriam-webster.com/games/octordle/daily-extreme",
+      test: function (l) { return oct.test(l.hostname) && /daily-extreme/.test(l.pathname); } },
+    { id: "octordle-rescue",  n: "Octordle Rescue",  u: "https://www.merriam-webster.com/games/octordle/daily-rescue",
+      test: function (l) { return oct.test(l.hostname) && /daily-rescue/.test(l.pathname); } },
+    { id: "octordle-classic", n: "Octordle Classic", u: "https://www.merriam-webster.com/games/octordle/daily",
+      test: function (l) { return oct.test(l.hostname) && /octordle/i.test(l.pathname + l.hostname); } },
+    { id: "absurdle",      n: "Absurdle",           u: "https://qntm.org/files/absurdle/absurdle.html",
+      test: function (l) { return /(^|\.)qntm\.org$/.test(l.hostname) && /absurdle/i.test(l.pathname); } },
+    { id: "waffle",        n: "Waffle",             u: "https://wafflegame.net",        test: host(/(^|\.)wafflegame\.net$/) },
+    { id: "squardle",      n: "Squardle",           u: "https://fubargames.se/squardle/",
+      test: function (l) { return /(^|\.)fubargames\.se$/.test(l.hostname) && /squardle/i.test(l.pathname); } },
+    { id: "crosswordle-9", n: "Crosswordle 9\u00d79", u: "https://crosswordle.com/daily9x9",
+      test: function (l) { return xw.test(l.hostname) && /9x9/i.test(l.pathname); } },
+    { id: "crosswordle-7", n: "Crosswordle 7\u00d77", u: "https://crosswordle.com/", test: host(xw) },
+    { id: "semantle-junior", n: "Semantle Junior",  u: "https://semantle.com/junior",
+      test: function (l) { return sem.test(l.hostname) && /junior/i.test(l.pathname); } },
+    { id: "semantle",      n: "Semantle",           u: "https://semantle.com",          test: host(sem) },
+    { id: "hunch",         n: "Hunch",              u: "https://hunch.game",            test: host(/(^|\.)hunch\.game$/) },
+    { id: "tilbo",         n: "Tilbo",              u: "https://tilbo.fun",             test: host(/(^|\.)tilbo\.fun$/) },
+    { id: "cluesbysam",    n: "Clues By Sam",       u: "https://cluesbysam.com",        test: host(/(^|\.)cluesbysam\.com$/) },
+    { id: "spectra",       n: "Spectra",            u: "https://spectra.quest",         test: host(/(^|\.)spectra\.quest$/) },
+    { id: "nerdle-micro",  n: "Nerdle Micro",       u: "https://micro.nerdlegame.com/", test: host(/^micro\.nerdlegame\.com$/) },
+    { id: "nerdle-mini",   n: "Nerdle Mini",        u: "https://mini.nerdlegame.com/",  test: host(/^mini\.nerdlegame\.com$/) },
+    { id: "nerdle-midi",   n: "Nerdle Midi",        u: "https://midi.nerdlegame.com/",  test: host(/^midi\.nerdlegame\.com$/) },
+    { id: "nerdle-classic",n: "Nerdle Classic",     u: "https://nerdlegame.com/",       test: host(/^(www\.)?nerdlegame\.com$/) },
+    { id: "framed",        n: "Framed",             u: "https://framed.wtf",            test: host(/(^|\.)framed\.wtf$/) },
+    { id: "bandle",        n: "Bandle",             u: "https://bandle.app",            test: host(/(^|\.)bandle\.app$/) },
+    { id: "travle",        n: "Travle",             u: "https://travle.earth",
+      test: function (l) { return /(^|\.)travle\.earth$/.test(l.hostname) ||
+        (/(^|\.)imois\.in$/.test(l.hostname) && /travle/i.test(l.pathname)); } },
+    { id: "timeguessr",    n: "TimeGuessr",         u: "https://timeguessr.com",        test: host(/(^|\.)timeguessr\.com$/) },
+    { id: "costcodle",     n: "Costcodle",          u: "https://costcodle.com",         test: host(/(^|\.)costcodle\.com$/) }
   ];
   var IDS = GAMES.map(function (g) { return g.id; });
 
@@ -176,9 +202,7 @@
   var game = null;
   for (var i = 0; i < GAMES.length; i++) {
     var g = GAMES[i];
-    var hit = g.test ? g.test(location)
-      : (g.host.test(location.hostname) && (!g.path || g.path.test(location.pathname)));
-    if (hit) { game = g; break; }
+    if (g.test(location)) { game = g; break; }
   }
   if (!game) return;
 

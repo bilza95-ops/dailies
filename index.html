@@ -76,10 +76,10 @@ body::before{
   padding-bottom:13px;margin-bottom:15px;border-bottom:1.5px dashed var(--rule)}
 .card-label{font-family:var(--display);font-weight:700;font-size:.9rem;letter-spacing:.04em}
 .clock{font-size:.76rem;color:var(--ink-faint)}
-.holes{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+.holes{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
 .hole{position:relative;aspect-ratio:1;border-radius:50%;padding:0;cursor:pointer;
   border:1.5px solid var(--rule);background:var(--hole);
-  font-family:var(--display);font-weight:700;font-size:.8rem;color:var(--ink-faint);
+  font-family:var(--display);font-weight:700;font-size:.72rem;color:var(--ink-faint);
   display:flex;align-items:center;justify-content:center;
   transition:background .2s ease,color .2s ease,border-color .2s ease}
 .hole.on{background:var(--green);border-color:var(--green);color:var(--panel)}
@@ -133,6 +133,21 @@ h2::after{content:"";flex:1;height:1.5px;background:var(--rule)}
 .row.done .mk.solve .ck{stroke-dashoffset:0}
 .row.miss .mk.fail{color:var(--pink)}
 .row.miss .mk.fail .x1,.row.miss .mk.fail .x2{stroke-dashoffset:0}
+
+/* grouped games */
+.ghead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  padding:11px 13px 9px;border-top:1px solid var(--rule)}
+.panel .ghead:first-child{border-top:0}
+.gname{font-weight:600;font-size:1rem}
+.gblurb{color:var(--ink-soft);font-size:.82rem;line-height:1.35;margin-top:1px}
+.gcount{font-size:.76rem;color:var(--ink-faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.row.sub .open{padding-left:26px;position:relative}
+.row.sub .open::before{content:"";position:absolute;left:14px;top:13px;bottom:13px;
+  width:2px;border-radius:1px;background:var(--rule)}
+.row.sub.done .open::before{background:var(--green)}
+.row.sub.miss .open::before{background:var(--pink)}
+.row.sub .name{font-size:.94rem}
+
 a:focus-visible,button:focus-visible{outline:2px solid var(--pink);outline-offset:-2px}
 
 footer{margin-top:30px;border-top:1.5px dashed var(--rule);padding-top:15px;
@@ -143,7 +158,7 @@ footer p{margin:0 0 9px}
   border:1.5px solid var(--rule);border-radius:4px;padding:6px 11px;cursor:pointer}
 .note{color:var(--pink)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-@media (max-width:340px){.holes{grid-template-columns:repeat(5,1fr)}.mk{width:42px}}
+@media (max-width:340px){.holes{grid-template-columns:repeat(6,1fr)}.mk{width:42px}}
 </style>
 </head>
 <body>
@@ -191,36 +206,73 @@ footer p{margin:0 0 9px}
 (function(){
 "use strict";
 
+/* An item is either a single puzzle, or a game with several daily boards. */
 var GAMES=[
  {g:"WORDS",items:[
-  {id:"parseword",n:"Parseword",b:"One cryptic clue a day, from Wordle's creator.",u:"https://www.parseword.com"},
-  {id:"minutecryptic",n:"Minute Cryptic",b:"A single cryptic clue, unpicked in about a minute.",u:"https://www.minutecryptic.com"},
-  {id:"octordle",n:"Octordle",b:"Eight boards at once, thirteen guesses.",u:"https://www.britannica.com/games/octordle/daily"},
-  {id:"absurdle",n:"Absurdle",b:"The answer squirms away from every guess.",u:"https://qntm.org/files/absurdle/absurdle.html"},
-  {id:"waffle",n:"Waffle",b:"Untangle six words in a waffle grid.",u:"https://wafflegame.net"},
-  {id:"squardle",n:"Squardle",b:"Wordle running in both directions at once.",u:"https://fubargames.se/squardle/"},
-  {id:"crosswordle",n:"Crosswordle",b:"Mini crossword solved by swapping letters home.",u:"https://crosswordle.com"},
-  {id:"semantle",n:"Semantle",b:"Hints by meaning, not spelling. Brutal.",u:"https://semantle.com"},
-  {id:"hunch",n:"Hunch",b:"Wordle crossed with Mastermind.",u:"https://hunch.game"},
-  {id:"tilbo",n:"Tilbo",b:"Words must interlock with what's already down.",u:"https://tilbo.fun"}
+  {id:"parseword",n:"Parseword",b:"One cryptic clue a day, from Wordle's creator.",k:"P",
+   u:"https://www.parseword.com"},
+  {id:"minutecryptic",n:"Minute Cryptic",b:"A single cryptic clue, unpicked in about a minute.",k:"M",
+   u:"https://www.minutecryptic.com"},
+  {n:"Octordle",b:"Eight boards at once, on Merriam-Webster.",variants:[
+    {id:"octordle-classic",n:"Classic",b:"13 guesses",k:"O",u:"https://www.merriam-webster.com/games/octordle/daily"},
+    {id:"octordle-chill",  n:"Chill",  b:"16 guesses, gentler words",k:"o",u:"https://www.merriam-webster.com/games/octordle/daily-chill"},
+    {id:"octordle-extreme",n:"Extreme",b:"12 guesses, nastier words",k:"E",u:"https://www.merriam-webster.com/games/octordle/daily-extreme"},
+    {id:"octordle-rescue", n:"Rescue", b:"9 guesses, computer picks your starters",k:"R",u:"https://www.merriam-webster.com/games/octordle/daily-rescue"}
+  ]},
+  {id:"absurdle",n:"Absurdle",b:"The answer squirms away from every guess.",k:"A",
+   u:"https://qntm.org/files/absurdle/absurdle.html"},
+  {id:"waffle",n:"Waffle",b:"Untangle six words in a waffle grid.",k:"W",
+   u:"https://wafflegame.net"},
+  {id:"squardle",n:"Squardle",b:"Wordle running in both directions at once.",k:"S",
+   u:"https://fubargames.se/squardle/"},
+  {n:"Crosswordle",b:"Mini crossword solved by swapping letters home.",variants:[
+    {id:"crosswordle-7",n:"Daily 7\u00d77",b:"the classic grid",k:"7",u:"https://crosswordle.com/"},
+    {id:"crosswordle-9",n:"Daily 9\u00d79",b:"bigger, more intersections",k:"9",u:"https://crosswordle.com/daily9x9"}
+  ]},
+  {n:"Semantle",b:"Hints by meaning, not spelling.",variants:[
+    {id:"semantle",n:"Classic",b:"the brutal original",k:"S",u:"https://semantle.com"},
+    {id:"semantle-junior",n:"Junior",b:"commoner vocabulary",k:"J",u:"https://semantle.com/junior"}
+  ]},
+  {id:"hunch",n:"Hunch",b:"Wordle crossed with Mastermind.",k:"H",u:"https://hunch.game"},
+  {id:"tilbo",n:"Tilbo",b:"Words must interlock with what's already down.",k:"T",u:"https://tilbo.fun"}
  ]},
  {g:"LOGIC",items:[
-  {id:"cluesbysam",n:"Clues By Sam",b:"Twenty suspects. No guessing allowed, ever.",u:"https://cluesbysam.com"},
-  {id:"spectra",n:"Spectra",b:"Sort the items by a metric you have to deduce.",u:"https://spectra.quest"},
-  {id:"nerdle",n:"Nerdle",b:"An equation instead of a word.",u:"https://nerdlegame.com"}
+  {id:"cluesbysam",n:"Clues By Sam",b:"Twenty suspects. No guessing allowed, ever.",k:"C",
+   u:"https://cluesbysam.com"},
+  {id:"spectra",n:"Spectra",b:"Sort the items by a metric you have to deduce.",k:"S",
+   u:"https://spectra.quest"},
+  {n:"Nerdle",b:"An equation instead of a word.",variants:[
+    {id:"nerdle-classic",n:"Classic",b:"8 characters",k:"N",u:"https://nerdlegame.com/"},
+    {id:"nerdle-micro",  n:"Micro",  b:"5 characters",k:"5",u:"https://micro.nerdlegame.com/"},
+    {id:"nerdle-mini",   n:"Mini",   b:"6 characters",k:"6",u:"https://mini.nerdlegame.com/"},
+    {id:"nerdle-midi",   n:"Midi",   b:"7 characters",k:"7",u:"https://midi.nerdlegame.com/"}
+  ]}
  ]},
  {g:"WORLD AND MEDIA",items:[
-  {id:"framed",n:"Framed",b:"Name the film from one frame, then another.",u:"https://framed.wtf"},
-  {id:"bandle",n:"Bandle",b:"The song, built up one instrument at a time.",u:"https://bandle.app"},
-  {id:"travle",n:"Travle",b:"Walk between two countries, naming every one.",u:"https://imois.in/games/travle"},
-  {id:"timeguessr",n:"TimeGuessr",b:"Where the photo was taken, and when.",u:"https://timeguessr.com"},
-  {id:"costcodle",n:"Costcodle",b:"Guess the price of a Costco item. Absurdly moreish.",u:"https://costcodle.com"}
+  {id:"framed",n:"Framed",b:"Name the film from one frame, then another.",k:"F",u:"https://framed.wtf"},
+  {id:"bandle",n:"Bandle",b:"The song, built up one instrument at a time.",k:"B",u:"https://bandle.app"},
+  {id:"travle",n:"Travle",b:"Walk between two countries, naming every one.",k:"T",u:"https://travle.earth"},
+  {id:"timeguessr",n:"TimeGuessr",b:"Where the photo was taken, and when.",k:"G",u:"https://timeguessr.com"},
+  {id:"costcodle",n:"Costcodle",b:"Guess the price of a Costco item. Absurdly moreish.",k:"$",u:"https://costcodle.com"}
  ]}
 ];
 
-var ALL=[];GAMES.forEach(function(s){s.items.forEach(function(i){ALL.push(i);});});
-var IDS=ALL.map(function(i){return i.id;});
-var BY={};ALL.forEach(function(i){BY[i.id]=i;});
+/* flatten to playable entries, remembering the parent game name */
+var ALL=[];
+GAMES.forEach(function(sec){
+  sec.items.forEach(function(it){
+    if(it.variants){
+      it.variants.forEach(function(v){
+        ALL.push({id:v.id,n:v.n,full:it.n+" "+v.n,b:v.b,k:v.k,u:v.u});
+      });
+    }else{
+      ALL.push({id:it.id,n:it.n,full:it.n,b:it.b,k:it.k,u:it.u});
+    }
+  });
+});
+var IDS=ALL.map(function(e){return e.id;});
+var BY={};ALL.forEach(function(e){BY[e.id]=e;});
+
 var KEY="dailies.v1", PEND="dailies.pending", COOKIE="dailies",
     EPOCH=Date.UTC(2025,0,1), WINDOW_DAYS=400, CK_DAYS=180;
 var state={v:2,updatedAt:0,done:{},miss:{}};
@@ -231,7 +283,6 @@ function idx(s){var p=s.split("-");return Math.round((Date.UTC(+p[0],+p[1]-1,+p[
 function fromIdx(n){var d=new Date(EPOCH+n*86400000);return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");}
 var TODAY=shift(0);
 
-/* a run counts days you turned up, win or lose */
 function runLength(id){
   var set=Object.create(null);
   state.done[id].forEach(function(d){set[d]=1;});
@@ -256,18 +307,31 @@ function cleanList(v,floor){
   });
   return keep.sort();
 }
+/* older saves used "octordle", "nerdle", "crosswordle" — fold them into the classic board */
+var LEGACY={octordle:"octordle-classic",nerdle:"nerdle-classic",crosswordle:"crosswordle-7"};
 function tidy(raw){
   var out=blank(),floor=idx(TODAY)-WINDOW_DAYS;
   out.updatedAt=(raw&&raw.updatedAt)||0;
   var ds=(raw&&raw.done)||{},ms=(raw&&raw.miss)||{};
+  function pull(src,target){
+    Object.keys(src||{}).forEach(function(key){
+      var id=LEGACY[key]||key;
+      var cur=target[id];
+      if(!cur)return;
+      cleanList(src[key],floor).forEach(function(d){
+        if(cur.indexOf(d)===-1)cur.push(d);
+      });
+      cur.sort();
+    });
+  }
+  pull(ds,out.done);
+  pull(ms,out.miss);
   IDS.forEach(function(id){
-    out.done[id]=cleanList(ds[id],floor);
-    var m=cleanList(ms[id],floor),solved=out.done[id];
-    out.miss[id]=m.filter(function(d){return solved.indexOf(d)===-1;});
+    var solved=out.done[id];
+    out.miss[id]=out.miss[id].filter(function(d){return solved.indexOf(d)===-1;});
   });
   return out;
 }
-/* cookie: 2 bits per day (solved, missed) over CK_DAYS */
 function encodeCookie(){
   var base=idx(TODAY)-(CK_DAYS-1),parts=[];
   IDS.forEach(function(id){
@@ -321,7 +385,7 @@ var holesEl=document.getElementById("holes"),listEl=document.getElementById("lis
     storeEl=document.getElementById("store"),nextEl=document.getElementById("nextup"),
     nextNameEl=document.getElementById("nextName"),askEl=document.getElementById("ask"),
     askTxtEl=document.getElementById("askTxt");
-var holes={},rows={};
+var holes={},rows={},groups=[];
 
 todayEl.textContent=new Date().toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"});
 
@@ -329,96 +393,119 @@ function remember(id){
   try{localStorage.setItem(PEND,JSON.stringify({id:id,t:Date.now()}));}catch(e){}
 }
 
-ALL.forEach(function(it){
+ALL.forEach(function(e){
   var b=document.createElement("button");
-  b.type="button";b.className="hole";b.textContent=it.n.charAt(0);
-  b.title=it.n;b.setAttribute("aria-label",it.n);
+  b.type="button";b.className="hole";b.textContent=e.k;
+  b.title=e.full;b.setAttribute("aria-label",e.full);
   b.addEventListener("click",function(){
-    var r=rows[it.id];if(r)r.el.scrollIntoView({behavior:"smooth",block:"center"});
+    var r=rows[e.id];if(r)r.el.scrollIntoView({behavior:"smooth",block:"center"});
   });
-  holes[it.id]=b;holesEl.appendChild(b);
+  holes[e.id]=b;holesEl.appendChild(b);
 });
+
+function buildRow(entry,isSub){
+  var row=document.createElement("div");
+  row.className="row"+(isSub?" sub":"");
+  var a=document.createElement("a");
+  a.className="open";a.href=entry.u;a.target="_blank";a.rel="noopener noreferrer";
+  a.innerHTML='<div class="name"></div><div class="blurb"></div>'+
+              '<div class="meter"><div class="week"></div><span class="run"></span></div>';
+  a.querySelector(".name").textContent=entry.n;
+  a.querySelector(".blurb").textContent=entry.b;
+  a.addEventListener("click",function(){remember(entry.id);});
+
+  var week=a.querySelector(".week"),days=[];
+  for(var i=-6;i<=0;i++){
+    var s=document.createElement("span");
+    s.className="day"+(i===0?" today":"");
+    week.appendChild(s);days.push(s);
+  }
+
+  var marks=document.createElement("div");marks.className="marks";
+  var fail=document.createElement("button");
+  fail.type="button";fail.className="mk fail";
+  fail.innerHTML='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'+
+    '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>'+
+    '<path class="x1" d="M8.5 8.5l7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'+
+    '<path class="x2" d="M15.5 8.5l-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+  fail.addEventListener("click",function(){toggle(entry.id,"miss");});
+
+  var solve=document.createElement("button");
+  solve.type="button";solve.className="mk solve";
+  solve.innerHTML='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'+
+    '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>'+
+    '<path class="ck" d="M7.5 12.4l3 3 6-6.4" stroke="currentColor" stroke-width="2.2" '+
+    'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  solve.addEventListener("click",function(){toggle(entry.id,"done");});
+
+  marks.appendChild(fail);marks.appendChild(solve);
+  row.appendChild(a);row.appendChild(marks);
+  rows[entry.id]={el:row,solve:solve,fail:fail,days:days,run:a.querySelector(".run")};
+  return row;
+}
 
 GAMES.forEach(function(sec){
   var h=document.createElement("h2");h.textContent=sec.g;listEl.appendChild(h);
   var panel=document.createElement("div");panel.className="panel";
   sec.items.forEach(function(it){
-    var row=document.createElement("div");row.className="row";
-    var a=document.createElement("a");
-    a.className="open";a.href=it.u;a.target="_blank";a.rel="noopener noreferrer";
-    a.innerHTML='<div class="name"></div><div class="blurb"></div>'+
-                '<div class="meter"><div class="week"></div><span class="run"></span></div>';
-    a.querySelector(".name").textContent=it.n;
-    a.querySelector(".blurb").textContent=it.b;
-    a.addEventListener("click",function(){remember(it.id);});
-
-    var week=a.querySelector(".week"),days=[];
-    for(var i=-6;i<=0;i++){
-      var s=document.createElement("span");
-      s.className="day"+(i===0?" today":"");
-      week.appendChild(s);days.push(s);
+    if(it.variants){
+      var head=document.createElement("div");head.className="ghead";
+      head.innerHTML='<div><div class="gname"></div><div class="gblurb"></div></div>'+
+                     '<div class="gcount"></div>';
+      head.querySelector(".gname").textContent=it.n;
+      head.querySelector(".gblurb").textContent=it.b;
+      panel.appendChild(head);
+      groups.push({el:head.querySelector(".gcount"),ids:it.variants.map(function(v){return v.id;})});
+      it.variants.forEach(function(v){panel.appendChild(buildRow(v,true));});
+    }else{
+      panel.appendChild(buildRow(it,false));
     }
-
-    var marks=document.createElement("div");marks.className="marks";
-    var fail=document.createElement("button");
-    fail.type="button";fail.className="mk fail";
-    fail.innerHTML='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'+
-      '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>'+
-      '<path class="x1" d="M8.5 8.5l7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'+
-      '<path class="x2" d="M15.5 8.5l-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-    fail.addEventListener("click",function(){toggle(it.id,"miss");});
-
-    var solve=document.createElement("button");
-    solve.type="button";solve.className="mk solve";
-    solve.innerHTML='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'+
-      '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>'+
-      '<path class="ck" d="M7.5 12.4l3 3 6-6.4" stroke="currentColor" stroke-width="2.2" '+
-      'stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    solve.addEventListener("click",function(){toggle(it.id,"done");});
-
-    marks.appendChild(fail);marks.appendChild(solve);
-    row.appendChild(a);row.appendChild(marks);panel.appendChild(row);
-    rows[it.id]={el:row,solve:solve,fail:fail,days:days,run:a.querySelector(".run")};
   });
   listEl.appendChild(panel);
 });
 
 function render(changed){
   var solved=0,missed=0,best=null,next=null;
-  ALL.forEach(function(it){
-    var on=state.done[it.id].indexOf(TODAY)!==-1,
-        bad=state.miss[it.id].indexOf(TODAY)!==-1;
+  ALL.forEach(function(e){
+    var on=state.done[e.id].indexOf(TODAY)!==-1,
+        bad=state.miss[e.id].indexOf(TODAY)!==-1;
     if(on)solved++;else if(bad)missed++;
-    if(!on&&!bad&&!next)next=it;
+    if(!on&&!bad&&!next)next=e;
 
-    var hole=holes[it.id];
-    if((on||bad)&&it.id===changed&&!hole.classList.contains("on")&&!hole.classList.contains("miss")){
+    var hole=holes[e.id];
+    if((on||bad)&&e.id===changed&&!hole.classList.contains("on")&&!hole.classList.contains("miss")){
       hole.classList.remove("punch");void hole.offsetWidth;hole.classList.add("punch");
     }
     hole.classList.toggle("on",on);
     hole.classList.toggle("miss",bad);
     hole.classList.remove("next");
 
-    var r=rows[it.id];
+    var r=rows[e.id];
     r.el.classList.toggle("done",on);
     r.el.classList.toggle("miss",bad);
     r.solve.setAttribute("aria-pressed",on?"true":"false");
     r.fail.setAttribute("aria-pressed",bad?"true":"false");
-    r.solve.setAttribute("aria-label",(on?"Unmark ":"Mark ")+it.n+" solved");
-    r.fail.setAttribute("aria-label",(bad?"Unmark ":"Mark ")+it.n+" missed");
+    r.solve.setAttribute("aria-label",(on?"Unmark ":"Mark ")+e.full+" solved");
+    r.fail.setAttribute("aria-label",(bad?"Unmark ":"Mark ")+e.full+" missed");
 
     for(var i=0;i<7;i++){
       var d=shift(i-6);
-      r.days[i].classList.toggle("on",state.done[it.id].indexOf(d)!==-1);
-      r.days[i].classList.toggle("miss",state.miss[it.id].indexOf(d)!==-1);
+      r.days[i].classList.toggle("on",state.done[e.id].indexOf(d)!==-1);
+      r.days[i].classList.toggle("miss",state.miss[e.id].indexOf(d)!==-1);
     }
 
-    var n=runLength(it.id);
+    var n=runLength(e.id);
     if(n>0){
       r.run.className="run live";
       r.run.innerHTML='<span class="n">'+n+'</span> day'+(n===1?"":"s");
-      if(!best||n>best.n)best={n:n,name:it.n};
+      if(!best||n>best.n)best={n:n,name:e.full};
     }else{r.run.className="run";r.run.textContent="no run yet";}
+  });
+
+  groups.forEach(function(g){
+    var done=0;
+    g.ids.forEach(function(id){if(state.done[id].indexOf(TODAY)!==-1)done++;});
+    g.el.textContent=done+" of "+g.ids.length;
   });
 
   var left=ALL.length-solved-missed;
@@ -431,7 +518,7 @@ function render(changed){
 
   if(next){
     holes[next.id].classList.add("next");
-    nextEl.hidden=false;nextEl.href=next.u;nextNameEl.textContent=next.n;
+    nextEl.hidden=false;nextEl.href=next.u;nextNameEl.textContent=next.full;
     nextEl.onclick=(function(id){return function(){remember(id);};})(next.id);
   }else{nextEl.hidden=true;}
 }
@@ -459,7 +546,7 @@ function checkPending(){
   if(state.done[p.id].indexOf(TODAY)!==-1||state.miss[p.id].indexOf(TODAY)!==-1){clearPending();return;}
   if(age<12000)return;
   asking=p.id;
-  askTxtEl.innerHTML='Back from <b>'+BY[p.id].n+'</b>. How did it go?';
+  askTxtEl.innerHTML='Back from <b>'+BY[p.id].full+'</b>. How did it go?';
   askEl.classList.add("show");
 }
 document.getElementById("askYes").addEventListener("click",function(){
