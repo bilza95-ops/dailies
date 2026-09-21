@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Dailies overlay
 // @namespace    dailies.punchcard
-// @version      1.0
+// @version      1.2
 // @description  A Dailies bar on every puzzle site: go home, punch it done, jump to the next one.
 // @author       you
 // @run-at       document-idle
 // @noframes
+// @updateURL    https://bilza95-ops.github.io/dailies/dailies-overlay.user.js
+// @downloadURL  https://bilza95-ops.github.io/dailies/dailies-overlay.user.js
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM.getValue
@@ -17,6 +19,8 @@
 // @match        *://minutecryptic.com/*
 // @match        *://octordle.com/*
 // @match        *://www.octordle.com/*
+// @match        *://www.britannica.com/games/*
+// @match        *://britannica.com/games/*
 // @match        *://qntm.org/*
 // @match        *://wafflegame.net/*
 // @match        *://www.wafflegame.net/*
@@ -54,7 +58,11 @@
   var GAMES = [
     { id: "parseword",     n: "Parseword",      u: "https://www.parseword.com",       host: /(^|\.)parseword\.com$/ },
     { id: "minutecryptic", n: "Minute Cryptic", u: "https://www.minutecryptic.com",   host: /(^|\.)minutecryptic\.com$/ },
-    { id: "octordle",      n: "Octordle",       u: "https://octordle.com",            host: /(^|\.)octordle\.com$/ },
+    { id: "octordle",      n: "Octordle",       u: "https://www.britannica.com/games/octordle/daily",
+      test: function (l) {
+        return /(^|\.)octordle\.com$/.test(l.hostname) ||
+               (/(^|\.)britannica\.com$/.test(l.hostname) && /octordle/i.test(l.pathname));
+      } },
     { id: "absurdle",      n: "Absurdle",       u: "https://qntm.org/files/absurdle/absurdle.html", host: /(^|\.)qntm\.org$/, path: /absurdle/i },
     { id: "waffle",        n: "Waffle",         u: "https://wafflegame.net",          host: /(^|\.)wafflegame\.net$/ },
     { id: "squardle",      n: "Squardle",       u: "https://fubargames.se/squardle/", host: /(^|\.)fubargames\.se$/, path: /squardle/i },
@@ -86,17 +94,23 @@
   }
 
   function blank() {
-    var o = {}; IDS.forEach(function (id) { o[id] = []; });
-    return { v: 1, updatedAt: 0, done: o };
+    var a = {}, b = {};
+    IDS.forEach(function (id) { a[id] = []; b[id] = []; });
+    return { v: 2, updatedAt: 0, done: a, miss: b };
+  }
+  function clean(v) {
+    if (!Array.isArray(v)) return [];
+    return v.filter(function (d) {
+      return typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d);
+    }).sort();
   }
   function tidy(raw) {
-    var out = blank(), src = (raw && raw.done) || {};
+    var out = blank(), ds = (raw && raw.done) || {}, ms = (raw && raw.miss) || {};
     out.updatedAt = (raw && raw.updatedAt) || 0;
     IDS.forEach(function (id) {
-      var v = src[id];
-      if (Array.isArray(v)) out.done[id] = v.filter(function (d) {
-        return typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d);
-      }).sort();
+      out.done[id] = clean(ds[id]);
+      var solved = out.done[id];
+      out.miss[id] = clean(ms[id]).filter(function (d) { return solved.indexOf(d) === -1; });
     });
     return out;
   }
@@ -110,10 +124,10 @@
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
            String(d.getDate()).padStart(2, "0");
   }
-  function runLength(list) {
-    if (!list || !list.length) return 0;
+  function runLength(id) {
     var set = Object.create(null);
-    list.forEach(function (d) { set[d] = 1; });
+    (state.done[id] || []).forEach(function (d) { set[d] = 1; });
+    (state.miss[id] || []).forEach(function (d) { set[d] = 1; });
     var i = set[today()] ? 0 : (set[dayBack(1)] ? 1 : null);
     if (i === null) return 0;
     var n = 0;
@@ -162,7 +176,9 @@
   var game = null;
   for (var i = 0; i < GAMES.length; i++) {
     var g = GAMES[i];
-    if (g.host.test(location.hostname) && (!g.path || g.path.test(location.pathname))) { game = g; break; }
+    var hit = g.test ? g.test(location)
+      : (g.host.test(location.hostname) && (!g.path || g.path.test(location.pathname)));
+    if (hit) { game = g; break; }
   }
   if (!game) return;
 
@@ -189,6 +205,11 @@
     '.nm{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}' +
     '.sub{font-size:11px;color:#A9B6D8;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '.sub .run{color:#FF5BA3;font-weight:600}' +
+    '.fail{border-left:1px solid rgba(255,255,255,.18);width:42px}' +
+    '.fail svg{width:22px;height:22px}' +
+    '.fail.on{color:#FF5BA3}' +
+    '.fail .x1,.fail .x2{stroke-dasharray:11;stroke-dashoffset:11;transition:stroke-dashoffset .25s ease}' +
+    '.fail.on .x1,.fail.on .x2{stroke-dashoffset:0}' +
     '.tick{border-left:1px solid rgba(255,255,255,.18)}' +
     '.tick svg{width:23px;height:23px}' +
     '.tick.on{color:#2ECC8B}' +
@@ -207,7 +228,12 @@
     '<div class="bar" id="bar">' +
       '<button class="b home" id="home" title="Back to Dailies">D</button>' +
       '<div class="mid"><div class="nm" id="nm"></div><div class="sub" id="sub"></div></div>' +
-      '<button class="b tick" id="tick" title="Punch it">' +
+      '<button class="b fail" id="fail" title="Missed it">' +
+        '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" ' +
+        'stroke-width="1.7"/><path class="x1" d="M8.5 8.5l7 7" stroke="currentColor" stroke-width="2.2" ' +
+        'stroke-linecap="round"/><path class="x2" d="M15.5 8.5l-7 7" stroke="currentColor" ' +
+        'stroke-width="2.2" stroke-linecap="round"/></svg></button>' +
+      '<button class="b tick" id="tick" title="Solved it">' +
         '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" ' +
         'stroke-width="1.7"/><path class="ck" d="M7.5 12.4l3 3 6-6.4" stroke="currentColor" ' +
         'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
@@ -220,28 +246,32 @@
 
   var $ = function (id) { return root.getElementById(id); };
   var barEl = $("bar"), badgeEl = $("badge"), nmEl = $("nm"), subEl = $("sub"),
-      tickEl = $("tick"), nextEl = $("next");
+      tickEl = $("tick"), failEl = $("fail"), nextEl = $("next");
 
   var state = blank(), nextGame = null;
 
   function paint() {
-    var list = state.done[game.id] || [];
-    var on = list.indexOf(today()) !== -1;
+    var on = (state.done[game.id] || []).indexOf(today()) !== -1;
+    var bad = (state.miss[game.id] || []).indexOf(today()) !== -1;
     var count = 0;
     IDS.forEach(function (id) { if ((state.done[id] || []).indexOf(today()) !== -1) count++; });
 
     nextGame = null;
     for (var k = 0; k < GAMES.length; k++) {
       var c = GAMES[k];
-      if (c.id !== game.id && (state.done[c.id] || []).indexOf(today()) === -1) { nextGame = c; break; }
+      if (c.id === game.id) continue;
+      if ((state.done[c.id] || []).indexOf(today()) === -1 &&
+          (state.miss[c.id] || []).indexOf(today()) === -1) { nextGame = c; break; }
     }
 
     nmEl.textContent = game.n;
-    var run = runLength(list);
-    subEl.innerHTML = count + " of " + GAMES.length + " today" +
+    var run = runLength(game.id);
+    subEl.innerHTML = count + " of " + GAMES.length + " solved" +
       (run ? ' &middot; <span class="run">' + run + "-day run</span>" : "");
     tickEl.classList.toggle("on", on);
+    failEl.classList.toggle("on", bad);
     tickEl.setAttribute("aria-pressed", on ? "true" : "false");
+    failEl.setAttribute("aria-pressed", bad ? "true" : "false");
     nextEl.disabled = !nextGame;
     nextEl.title = nextGame ? "Next: " + nextGame.n : "Card complete";
   }
@@ -252,14 +282,20 @@
   }
 
   $("home").addEventListener("click", function () { location.href = HOME; });
-  tickEl.addEventListener("click", function () {
-    var list = state.done[game.id], i = list.indexOf(today());
+  function mark(kind) {
+    var mine = state[kind][game.id],
+        other = state[kind === "done" ? "miss" : "done"][game.id],
+        i = mine.indexOf(today());
     if (i === -1) {
-      list.push(today()); list.sort();
+      mine.push(today()); mine.sort();
+      var j = other.indexOf(today());
+      if (j !== -1) other.splice(j, 1);
       if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) {}
-    } else { list.splice(i, 1); }
+    } else { mine.splice(i, 1); }
     commit(); paint();
-  });
+  }
+  tickEl.addEventListener("click", function () { mark("done"); });
+  failEl.addEventListener("click", function () { mark("miss"); });
   nextEl.addEventListener("click", function () { if (nextGame) location.href = nextGame.u; });
   $("x").addEventListener("click", function () {
     barEl.classList.add("hidden"); badgeEl.classList.add("show"); setVal(HIDE_KEY, true);
