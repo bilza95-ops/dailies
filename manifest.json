@@ -1,13 +1,13 @@
 {
   "name": "Dailies",
   "short_name": "Dailies",
-  "description": "Daily puzzle punch card",
+  "description": "Daily puzzle departure board",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#E7E8E3",
-  "theme_color": "#243A6B",
+  "background_color": "#0E1116",
+  "theme_color": "#0E1116",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

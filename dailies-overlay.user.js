@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Dailies overlay
-// @namespace    dailies.punchcard
-// @version      1.4
-// @description  A Dailies bar on every puzzle site: go home, punch it done, jump to the next one.
+// @namespace    dailies.departures
+// @version      2.0
+// @description  A Dailies bar on every puzzle site: go home, log the result, catch the next departure.
 // @author       you
 // @run-at       document-idle
 // @noframes
@@ -17,38 +17,61 @@
 // @match        *://parseword.com/*
 // @match        *://www.minutecryptic.com/*
 // @match        *://minutecryptic.com/*
-// @match        *://octordle.com/*
-// @match        *://www.octordle.com/*
-// @match        *://www.britannica.com/games/*
-// @match        *://britannica.com/games/*
 // @match        *://www.merriam-webster.com/games/octordle/*
 // @match        *://merriam-webster.com/games/octordle/*
-// @match        *://micro.nerdlegame.com/*
-// @match        *://mini.nerdlegame.com/*
-// @match        *://midi.nerdlegame.com/*
-// @match        *://travle.earth/*
-// @match        *://www.travle.earth/*
+// @match        *://www.britannica.com/games/*
+// @match        *://octordle.com/*
+// @match        *://www.octordle.com/*
 // @match        *://qntm.org/*
 // @match        *://wafflegame.net/*
 // @match        *://www.wafflegame.net/*
 // @match        *://fubargames.se/*
+// @match        *://squaredle.app/*
 // @match        *://crosswordle.com/*
 // @match        *://www.crosswordle.com/*
 // @match        *://semantle.com/*
 // @match        *://www.semantle.com/*
+// @match        *://fibble.xyz/*
+// @match        *://www.polygonle.com/*
+// @match        *://polygonle.com/*
+// @match        *://fusele.netlify.app/*
+// @match        *://betweenle.com/*
+// @match        *://www.betweenle.com/*
 // @match        *://hunch.game/*
 // @match        *://tilbo.fun/*
+// @match        *://www.linkedin.com/games/*
 // @match        *://cluesbysam.com/*
 // @match        *://www.cluesbysam.com/*
 // @match        *://spectra.quest/*
+// @match        *://parlorbox.com/*
+// @match        *://www.zebrapuzzles.com/*
+// @match        *://zebrapuzzles.com/*
+// @match        *://www.netflix.com/tudum/puzzled/*
+// @match        *://dailyakari.com/*
+// @match        *://www.dailyakari.com/*
+// @match        *://shikakuofthe.day/*
+// @match        *://loopy.wtf/*
+// @match        *://sumplete.com/*
+// @match        *://www.sumplete.com/*
+// @match        *://www.nonodaily.com/*
+// @match        *://nonodaily.com/*
+// @match        *://mineswifter.com/*
+// @match        *://www.mineswifter.com/*
 // @match        *://nerdlegame.com/*
 // @match        *://www.nerdlegame.com/*
+// @match        *://micro.nerdlegame.com/*
+// @match        *://mini.nerdlegame.com/*
+// @match        *://midi.nerdlegame.com/*
 // @match        *://framed.wtf/*
 // @match        *://bandle.app/*
 // @match        *://www.bandle.app/*
+// @match        *://travle.earth/*
+// @match        *://www.travle.earth/*
 // @match        *://imois.in/*
 // @match        *://timeguessr.com/*
 // @match        *://www.timeguessr.com/*
+// @match        *://chronle.com/*
+// @match        *://www.chronle.com/*
 // @match        *://costcodle.com/*
 // @match        *://www.costcodle.com/*
 // ==/UserScript==
@@ -56,60 +79,87 @@
 (function () {
   "use strict";
 
-  /* ---- CHANGE THIS if your Pages URL is different ---- */
+  /* ---- CHANGE THIS if your Pages URL differs ---- */
   var HOME = "https://bilza95-ops.github.io/dailies/";
 
   var KEY = "dailies.v1";
   var PREF_KEY = "dailies.barPrefs";
-  /* sites whose own controls sit where the bar would: start out of the way */
-  var PREF_DEFAULTS = { timeguessr: { hidden: true, pos: "top" } };
+  /* sites whose own controls sit where the bar would */
+  var PREF_DEFAULTS = {
+    timeguessr: { hidden: true, pos: "top" },
+    starstruck: { pos: "top" },
+    "li-zip": { pos: "top" },
+    loopy: { pos: "top" }
+  };
 
-  function host(re) { return function (l) { return re.test(l.hostname); }; }
-  var oct = /(^|\.)(merriam-webster\.com|britannica\.com|octordle\.com)$/;
-  var xw  = /(^|\.)crosswordle\.com$/;
-  var sem = /(^|\.)semantle\.com$/;
+  function h(re) { return function (l) { return re.test(l.hostname); }; }
+  function hp(hre, pre) {
+    return function (l) { return hre.test(l.hostname) && pre.test(l.pathname); };
+  }
+  var OCT = /(^|\.)(merriam-webster\.com|britannica\.com|octordle\.com)$/;
+  var XW  = /(^|\.)crosswordle\.com$/;
+  var SEM = /(^|\.)semantle\.com$/;
+  var LI  = /(^|\.)linkedin\.com$/;
+  var NFX = /(^|\.)netflix\.com$/;
 
+  /* order matters: more specific matchers first within a site */
   var GAMES = [
-    { id: "parseword",     n: "Parseword",          u: "https://www.parseword.com",     test: host(/(^|\.)parseword\.com$/) },
-    { id: "minutecryptic", n: "Minute Cryptic",     u: "https://www.minutecryptic.com", test: host(/(^|\.)minutecryptic\.com$/) },
-    { id: "octordle-chill",   n: "Octordle Chill",   u: "https://www.merriam-webster.com/games/octordle/daily-chill",
-      test: function (l) { return oct.test(l.hostname) && /daily-chill/.test(l.pathname); } },
-    { id: "octordle-extreme", n: "Octordle Extreme", u: "https://www.merriam-webster.com/games/octordle/daily-extreme",
-      test: function (l) { return oct.test(l.hostname) && /daily-extreme/.test(l.pathname); } },
-    { id: "octordle-rescue",  n: "Octordle Rescue",  u: "https://www.merriam-webster.com/games/octordle/daily-rescue",
-      test: function (l) { return oct.test(l.hostname) && /daily-rescue/.test(l.pathname); } },
+    { id: "parseword",        n: "Parseword",        u: "https://www.parseword.com",     test: h(/(^|\.)parseword\.com$/) },
+    { id: "minutecryptic",    n: "Minute Cryptic",   u: "https://www.minutecryptic.com", test: h(/(^|\.)minutecryptic\.com$/) },
+    { id: "octordle-chill",   n: "Octordle Chill",   u: "https://www.merriam-webster.com/games/octordle/daily-chill",   test: hp(OCT, /daily-chill/) },
+    { id: "octordle-extreme", n: "Octordle Extreme", u: "https://www.merriam-webster.com/games/octordle/daily-extreme", test: hp(OCT, /daily-extreme/) },
+    { id: "octordle-rescue",  n: "Octordle Rescue",  u: "https://www.merriam-webster.com/games/octordle/daily-rescue",  test: hp(OCT, /daily-rescue/) },
     { id: "octordle-classic", n: "Octordle Classic", u: "https://www.merriam-webster.com/games/octordle/daily",
-      test: function (l) { return oct.test(l.hostname) && /octordle/i.test(l.pathname + l.hostname); } },
-    { id: "absurdle",      n: "Absurdle",           u: "https://qntm.org/files/absurdle/absurdle.html",
-      test: function (l) { return /(^|\.)qntm\.org$/.test(l.hostname) && /absurdle/i.test(l.pathname); } },
-    { id: "waffle",        n: "Waffle",             u: "https://wafflegame.net",        test: host(/(^|\.)wafflegame\.net$/) },
-    { id: "squardle",      n: "Squardle",           u: "https://fubargames.se/squardle/",
-      test: function (l) { return /(^|\.)fubargames\.se$/.test(l.hostname) && /squardle/i.test(l.pathname); } },
-    { id: "crosswordle-9", n: "Crosswordle 9\u00d79", u: "https://crosswordle.com/daily9x9",
-      test: function (l) { return xw.test(l.hostname) && /9x9/i.test(l.pathname); } },
-    { id: "crosswordle-7", n: "Crosswordle 7\u00d77", u: "https://crosswordle.com/", test: host(xw) },
-    { id: "semantle-junior", n: "Semantle Junior",  u: "https://semantle.com/junior",
-      test: function (l) { return sem.test(l.hostname) && /junior/i.test(l.pathname); } },
-    { id: "semantle",      n: "Semantle",           u: "https://semantle.com",          test: host(sem) },
-    { id: "hunch",         n: "Hunch",              u: "https://hunch.game",            test: host(/(^|\.)hunch\.game$/) },
-    { id: "tilbo",         n: "Tilbo",              u: "https://tilbo.fun",             test: host(/(^|\.)tilbo\.fun$/) },
-    { id: "cluesbysam",    n: "Clues By Sam",       u: "https://cluesbysam.com",        test: host(/(^|\.)cluesbysam\.com$/) },
-    { id: "spectra",       n: "Spectra",            u: "https://spectra.quest",         test: host(/(^|\.)spectra\.quest$/) },
-    { id: "nerdle-micro",  n: "Nerdle Micro",       u: "https://micro.nerdlegame.com/", test: host(/^micro\.nerdlegame\.com$/) },
-    { id: "nerdle-mini",   n: "Nerdle Mini",        u: "https://mini.nerdlegame.com/",  test: host(/^mini\.nerdlegame\.com$/) },
-    { id: "nerdle-midi",   n: "Nerdle Midi",        u: "https://midi.nerdlegame.com/",  test: host(/^midi\.nerdlegame\.com$/) },
-    { id: "nerdle-classic",n: "Nerdle Classic",     u: "https://nerdlegame.com/",       test: host(/^(www\.)?nerdlegame\.com$/) },
-    { id: "framed",        n: "Framed",             u: "https://framed.wtf",            test: host(/(^|\.)framed\.wtf$/) },
-    { id: "bandle",        n: "Bandle",             u: "https://bandle.app",            test: host(/(^|\.)bandle\.app$/) },
-    { id: "travle",        n: "Travle",             u: "https://travle.earth",
+      test: function (l) { return OCT.test(l.hostname) && /octordle/i.test(l.pathname + l.hostname); } },
+    { id: "absurdle",         n: "Absurdle",         u: "https://qntm.org/files/absurdle/absurdle.html", test: hp(/(^|\.)qntm\.org$/, /absurdle/i) },
+    { id: "waffle",           n: "Waffle",           u: "https://wafflegame.net/daily",  test: h(/(^|\.)wafflegame\.net$/) },
+    { id: "squardle",         n: "Squardle",         u: "https://fubargames.se/squardle/", test: hp(/(^|\.)fubargames\.se$/, /squardle/i) },
+    { id: "squaredle",        n: "Squaredle",        u: "https://squaredle.app",         test: h(/(^|\.)squaredle\.app$/) },
+    { id: "crosswordle-9",    n: "Crosswordle 9x9",  u: "https://crosswordle.com/daily9x9", test: hp(XW, /9x9/i) },
+    { id: "crosswordle-7",    n: "Crosswordle 7x7",  u: "https://crosswordle.com/",      test: h(XW) },
+    { id: "semantle-junior",  n: "Semantle Junior",  u: "https://semantle.com/junior",   test: hp(SEM, /junior/i) },
+    { id: "semantle",         n: "Semantle",         u: "https://semantle.com",          test: h(SEM) },
+    { id: "fibble",           n: "Fibble",           u: "https://fibble.xyz",            test: h(/(^|\.)fibble\.xyz$/) },
+    { id: "polygonle",        n: "Polygonle",        u: "https://www.polygonle.com",     test: h(/(^|\.)polygonle\.com$/) },
+    { id: "fusele",           n: "Fusele",           u: "https://fusele.netlify.app/?daily", test: h(/(^|\.)fusele\.netlify\.app$/) },
+    { id: "betweenle",        n: "Betweenle",        u: "https://betweenle.com",         test: h(/(^|\.)betweenle\.com$/) },
+    { id: "hunch",            n: "Hunch",            u: "https://hunch.game",            test: h(/(^|\.)hunch\.game$/) },
+    { id: "tilbo",            n: "Tilbo",            u: "https://tilbo.fun",             test: h(/(^|\.)tilbo\.fun$/) },
+    { id: "li-pinpoint",      n: "Pinpoint",         u: "https://www.linkedin.com/games/pinpoint",     test: hp(LI, /\/games\/pinpoint/) },
+    { id: "li-crossclimb",    n: "Crossclimb",       u: "https://www.linkedin.com/games/crossclimb",   test: hp(LI, /\/games\/crossclimb/) },
+    { id: "li-wend",          n: "Wend",             u: "https://www.linkedin.com/games/wend/",        test: hp(LI, /\/games\/wend/) },
+    { id: "li-queens",        n: "Queens",           u: "https://www.linkedin.com/games/queens",       test: hp(LI, /\/games\/queens/) },
+    { id: "li-tango",         n: "Tango",            u: "https://www.linkedin.com/games/tango",        test: hp(LI, /\/games\/tango/) },
+    { id: "li-zip",           n: "Zip",              u: "https://www.linkedin.com/games/zip",          test: hp(LI, /\/games\/zip/) },
+    { id: "li-minisudoku",    n: "Mini Sudoku",      u: "https://www.linkedin.com/games/mini-sudoku/", test: hp(LI, /\/games\/mini-sudoku/) },
+    { id: "li-patches",       n: "Patches",          u: "https://www.linkedin.com/games/patches/",     test: hp(LI, /\/games\/patches/) },
+    { id: "cluesbysam",       n: "Clues By Sam",     u: "https://cluesbysam.com",        test: h(/(^|\.)cluesbysam\.com$/) },
+    { id: "spectra",          n: "Spectra",          u: "https://spectra.quest",         test: h(/(^|\.)spectra\.quest$/) },
+    { id: "murdle-x",         n: "Parlorbox",        u: "https://parlorbox.com/",        test: h(/(^|\.)parlorbox\.com$/) },
+    { id: "zebra",            n: "Zebra Puzzles",    u: "https://www.zebrapuzzles.com",  test: h(/(^|\.)zebrapuzzles\.com$/) },
+    { id: "starstruck",       n: "Starstruck",       u: "https://www.netflix.com/tudum/puzzled/starstruck/daily", test: hp(NFX, /starstruck/i) },
+    { id: "akari",            n: "Daily Akari",      u: "https://dailyakari.com",        test: h(/(^|\.)dailyakari\.com$/) },
+    { id: "shikaku",          n: "Shikaku",          u: "https://shikakuofthe.day",      test: h(/(^|\.)shikakuofthe\.day$/) },
+    { id: "loopy",            n: "Loopy",            u: "https://loopy.wtf",             test: h(/(^|\.)loopy\.wtf$/) },
+    { id: "sumplete",         n: "Sumplete",         u: "https://sumplete.com/daily",    test: h(/(^|\.)sumplete\.com$/) },
+    { id: "nonodaily",        n: "NonoDaily",        u: "https://www.nonodaily.com",     test: h(/(^|\.)nonodaily\.com$/) },
+    { id: "mineswifter",      n: "Mineswifter",      u: "https://mineswifter.com",       test: h(/(^|\.)mineswifter\.com$/) },
+    { id: "nerdle-micro",     n: "Nerdle Micro",     u: "https://micro.nerdlegame.com/", test: h(/^micro\.nerdlegame\.com$/) },
+    { id: "nerdle-mini",      n: "Nerdle Mini",      u: "https://mini.nerdlegame.com/",  test: h(/^mini\.nerdlegame\.com$/) },
+    { id: "nerdle-midi",      n: "Nerdle Midi",      u: "https://midi.nerdlegame.com/",  test: h(/^midi\.nerdlegame\.com$/) },
+    { id: "nerdle-classic",   n: "Nerdle Classic",   u: "https://nerdlegame.com/",       test: h(/^(www\.)?nerdlegame\.com$/) },
+    { id: "framed",           n: "Framed",           u: "https://framed.wtf",            test: h(/(^|\.)framed\.wtf$/) },
+    { id: "bandle",           n: "Bandle",           u: "https://bandle.app",            test: h(/(^|\.)bandle\.app$/) },
+    { id: "travle",           n: "Travle",           u: "https://travle.earth",
       test: function (l) { return /(^|\.)travle\.earth$/.test(l.hostname) ||
         (/(^|\.)imois\.in$/.test(l.hostname) && /travle/i.test(l.pathname)); } },
-    { id: "timeguessr",    n: "TimeGuessr",         u: "https://timeguessr.com",        test: host(/(^|\.)timeguessr\.com$/) },
-    { id: "costcodle",     n: "Costcodle",          u: "https://costcodle.com",         test: host(/(^|\.)costcodle\.com$/) }
+    { id: "timeguessr",       n: "TimeGuessr",       u: "https://timeguessr.com",        test: h(/(^|\.)timeguessr\.com$/) },
+    { id: "chronle",          n: "Chronle",          u: "https://chronle.com",           test: h(/(^|\.)chronle\.com$/) },
+    { id: "costcodle",        n: "Costcodle",        u: "https://costcodle.com",         test: h(/(^|\.)costcodle\.com$/) }
   ];
   var IDS = GAMES.map(function (g) { return g.id; });
 
-  /* ---------- shared store (script-scoped, so it crosses origins) ---------- */
+  /* ---------- shared store, crosses origins ---------- */
   function getVal(k, d) {
     if (typeof GM_getValue === "function") return Promise.resolve(GM_getValue(k, d));
     if (typeof GM !== "undefined" && GM.getValue) return GM.getValue(k, d);
@@ -120,7 +170,6 @@
     if (typeof GM !== "undefined" && GM.setValue) return GM.setValue(k, v);
     return Promise.resolve();
   }
-
   function blank() {
     var a = {}, b = {};
     IDS.forEach(function (id) { a[id] = []; b[id] = []; });
@@ -152,32 +201,19 @@
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
            String(d.getDate()).padStart(2, "0");
   }
-  function runLength(id) {
-    var set = Object.create(null);
-    (state.done[id] || []).forEach(function (d) { set[d] = 1; });
-    (state.miss[id] || []).forEach(function (d) { set[d] = 1; });
-    var i = set[today()] ? 0 : (set[dayBack(1)] ? 1 : null);
-    if (i === null) return 0;
-    var n = 0;
-    while (set[dayBack(i)]) { n++; i++; }
-    return n;
-  }
 
   /* ---------- on the Dailies page: bridge the two stores ---------- */
   if (location.href.indexOf(HOME.replace(/\/$/, "")) === 0) {
     (function bridge() {
       var lastPushed = 0;
-
       function pageState() {
         try {
           var raw = localStorage.getItem(KEY);
           return raw ? tidy(JSON.parse(raw)) : null;
         } catch (e) { return null; }
       }
-
       getVal(KEY, null).then(function (shared) {
-        var s = shared ? tidy(shared) : null;
-        var p = pageState();
+        var s = shared ? tidy(shared) : null, p = pageState();
         if (s && (!p || s.updatedAt > p.updatedAt)) {
           try {
             localStorage.setItem(KEY, JSON.stringify(s));
@@ -191,7 +227,6 @@
         if (p) lastPushed = p.updatedAt;
         if (p && (!s || p.updatedAt > s.updatedAt)) setVal(KEY, p);
       });
-
       setInterval(function () {
         var p = pageState();
         if (p && p.updatedAt > lastPushed) { lastPushed = p.updatedAt; setVal(KEY, p); }
@@ -203,10 +238,11 @@
   /* ---------- which puzzle is this? ---------- */
   var game = null;
   for (var i = 0; i < GAMES.length; i++) {
-    var g = GAMES[i];
-    if (g.test(location)) { game = g; break; }
+    if (GAMES[i].test(location)) { game = GAMES[i]; break; }
   }
   if (!game) return;
+
+  var state = blank(), nextGame = null, prefs = {};
 
   /* ---------- the bar ---------- */
   var host = document.createElement("div");
@@ -217,58 +253,56 @@
   root.innerHTML =
     '<style>' +
     ':host{all:initial}' +
-    '*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}' +
+    '*{box-sizing:border-box;margin:0;padding:0;' +
+      'font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif}' +
     '.bar{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));' +
-      'max-width:440px;margin:0 auto;display:flex;align-items:stretch;gap:0;height:46px;' +
-      'background:#243A6B;color:#F1F2ED;border-radius:9px;overflow:hidden;' +
-      'box-shadow:0 6px 22px rgba(0,0,0,.34);font-size:14px}' +
+      'max-width:460px;margin:0 auto;display:flex;align-items:stretch;height:46px;' +
+      'background:#0E1116;color:#E7EAEE;border:1px solid #252D38;border-radius:4px;' +
+      'overflow:hidden;box-shadow:0 8px 26px rgba(0,0,0,.5)}' +
     '.bar.hidden{display:none}' +
     '.bar.top{top:calc(10px + env(safe-area-inset-top,0px));bottom:auto}' +
-    '.b{background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;display:flex;' +
-      'align-items:center;justify-content:center;flex:0 0 auto;width:46px}' +
-    '.b:active{background:rgba(255,255,255,.14)}' +
-    '.home{font-weight:800;font-size:17px;letter-spacing:.02em;border-right:1px solid rgba(255,255,255,.18)}' +
-    '.mid{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:0 11px;gap:1px}' +
-    '.nm{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}' +
-    '.sub{font-size:11px;color:#A9B6D8;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '.sub .run{color:#FF5BA3;font-weight:600}' +
-    '.fail{border-left:1px solid rgba(255,255,255,.18);width:42px}' +
-    '.fail svg{width:22px;height:22px}' +
-    '.fail.on{color:#FF5BA3}' +
-    '.fail .x1,.fail .x2{stroke-dasharray:11;stroke-dashoffset:11;transition:stroke-dashoffset .25s ease}' +
-    '.fail.on .x1,.fail.on .x2{stroke-dashoffset:0}' +
-    '.tick{border-left:1px solid rgba(255,255,255,.18)}' +
-    '.tick svg{width:23px;height:23px}' +
-    '.tick.on{color:#2ECC8B}' +
-    '.tick .ck{stroke-dasharray:22;stroke-dashoffset:22;transition:stroke-dashoffset .25s ease}' +
-    '.tick.on .ck{stroke-dashoffset:0}' +
-    '.next{border-left:1px solid rgba(255,255,255,.18);font-size:19px;font-weight:700}' +
-    '.next[disabled]{opacity:.32}' +
-    '.move{width:30px;font-size:14px;color:#8FA0CC;border-left:1px solid rgba(255,255,255,.18)}' +
-    '.x{width:30px;font-size:15px;color:#8FA0CC;border-left:1px solid rgba(255,255,255,.18)}' +
+    '.b{background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;' +
+      'display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:44px}' +
+    '.b:active{background:rgba(255,176,32,.16)}' +
+    '.home{font-weight:700;font-size:19px;color:#FFB020;letter-spacing:.04em;' +
+      'border-right:1px solid #252D38}' +
+    '.mid{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;' +
+      'padding:0 10px;gap:1px}' +
+    '.nm{font-weight:600;font-size:15px;letter-spacing:.04em;text-transform:uppercase;' +
+      'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1}' +
+    '.st{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:9.5px;' +
+      'letter-spacing:.1em;color:#FFB020;white-space:pre;line-height:1.2}' +
+    '.st.departed{color:#35D07F}' +
+    '.st.cancelled{color:#FF5C63}' +
+    '.st .run{color:#6C7684}' +
+    '.no{border-left:1px solid #252D38;width:40px;color:#6C7684}' +
+    '.no.on{color:#FF5C63}' +
+    '.go{border-left:1px solid #252D38;color:#6C7684}' +
+    '.go.on{color:#35D07F}' +
+    '.b svg{width:20px;height:20px}' +
+    '.next{border-left:1px solid #252D38;font-size:19px;font-weight:700;color:#FFB020}' +
+    '.next[disabled]{opacity:.3}' +
+    '.move,.x{width:28px;font-size:13px;color:#4E5763;border-left:1px solid #252D38}' +
     '.badge{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));' +
-      'width:40px;height:40px;border-radius:50%;background:#243A6B;color:#F1F2ED;border:0;' +
-      'font-weight:800;font-size:16px;cursor:pointer;display:none;align-items:center;' +
-      'justify-content:center;box-shadow:0 5px 16px rgba(0,0,0,.34)}' +
+      'width:38px;height:38px;border-radius:4px;background:#0E1116;color:#FFB020;' +
+      'border:1px solid #252D38;font-weight:700;font-size:17px;cursor:pointer;display:none;' +
+      'align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.5)}' +
     '.badge.show{display:flex}' +
     '.badge.top{top:calc(12px + env(safe-area-inset-top,0px));left:12px;right:auto;bottom:auto;' +
-      'width:34px;height:34px;font-size:14px;opacity:.9}' +
-    '@media (prefers-reduced-motion:reduce){*{transition:none!important}}' +
+      'width:32px;height:32px;font-size:15px;opacity:.92}' +
     '</style>' +
     '<div class="bar" id="bar">' +
       '<button class="b home" id="home" title="Back to Dailies">D</button>' +
-      '<div class="mid"><div class="nm" id="nm"></div><div class="sub" id="sub"></div></div>' +
-      '<button class="b fail" id="fail" title="Missed it">' +
-        '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" ' +
-        'stroke-width="1.7"/><path class="x1" d="M8.5 8.5l7 7" stroke="currentColor" stroke-width="2.2" ' +
-        'stroke-linecap="round"/><path class="x2" d="M15.5 8.5l-7 7" stroke="currentColor" ' +
-        'stroke-width="2.2" stroke-linecap="round"/></svg></button>' +
-      '<button class="b tick" id="tick" title="Solved it">' +
-        '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" ' +
-        'stroke-width="1.7"/><path class="ck" d="M7.5 12.4l3 3 6-6.4" stroke="currentColor" ' +
-        'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
-      '<button class="b next" id="next" title="Next puzzle">&rarr;</button>' +
-      '<button class="b move" id="move" title="Move to the other end">&#8597;</button>' +
+      '<div class="mid"><div class="nm" id="nm"></div><div class="st" id="st"></div></div>' +
+      '<button class="b no" id="no" title="Missed it">' +
+        '<svg viewBox="0 0 24 24" fill="none"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" ' +
+        'stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></button>' +
+      '<button class="b go" id="go" title="Solved it">' +
+        '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" ' +
+        'stroke="currentColor" stroke-width="2.3" stroke-linecap="round" ' +
+        'stroke-linejoin="round"/></svg></button>' +
+      '<button class="b next" id="nx" title="Next departure">&rarr;</button>' +
+      '<button class="b move" id="move" title="Move">&#8597;</button>' +
       '<button class="b x" id="x" title="Hide">&times;</button>' +
     '</div>' +
     '<button class="badge" id="badge" title="Show Dailies">D</button>';
@@ -276,46 +310,11 @@
   (document.body || document.documentElement).appendChild(host);
 
   var $ = function (id) { return root.getElementById(id); };
-  var barEl = $("bar"), badgeEl = $("badge"), nmEl = $("nm"), subEl = $("sub"),
-      tickEl = $("tick"), failEl = $("fail"), nextEl = $("next");
+  var barEl = $("bar"), badgeEl = $("badge"), nmEl = $("nm"), stEl = $("st"),
+      goEl = $("go"), noEl = $("no"), nxEl = $("nx");
 
-  var state = blank(), nextGame = null;
-
-  function paint() {
-    var on = (state.done[game.id] || []).indexOf(today()) !== -1;
-    var bad = (state.miss[game.id] || []).indexOf(today()) !== -1;
-    var count = 0;
-    IDS.forEach(function (id) { if ((state.done[id] || []).indexOf(today()) !== -1) count++; });
-
-    nextGame = null;
-    for (var k = 0; k < GAMES.length; k++) {
-      var c = GAMES[k];
-      if (c.id === game.id) continue;
-      if ((state.done[c.id] || []).indexOf(today()) === -1 &&
-          (state.miss[c.id] || []).indexOf(today()) === -1) { nextGame = c; break; }
-    }
-
-    nmEl.textContent = game.n;
-    var run = runLength(game.id);
-    subEl.innerHTML = count + " of " + GAMES.length + " solved" +
-      (run ? ' &middot; <span class="run">' + run + "-day run</span>" : "");
-    tickEl.classList.toggle("on", on);
-    failEl.classList.toggle("on", bad);
-    tickEl.setAttribute("aria-pressed", on ? "true" : "false");
-    failEl.setAttribute("aria-pressed", bad ? "true" : "false");
-    nextEl.disabled = !nextGame;
-    nextEl.title = nextGame ? "Next: " + nextGame.n : "Card complete";
-  }
-
-  function commit() {
-    state.updatedAt = Date.now();
-    setVal(KEY, state);
-  }
-
-  var prefs = {};
   function myPref() {
-    var d = PREF_DEFAULTS[game.id] || {};
-    var p = prefs[game.id] || {};
+    var d = PREF_DEFAULTS[game.id] || {}, p = prefs[game.id] || {};
     return {
       hidden: p.hidden !== undefined ? p.hidden : (d.hidden || false),
       pos: p.pos || d.pos || "bottom"
@@ -323,8 +322,10 @@
   }
   function setPref(patch) {
     var cur = myPref();
-    prefs[game.id] = { hidden: patch.hidden !== undefined ? patch.hidden : cur.hidden,
-                       pos: patch.pos || cur.pos };
+    prefs[game.id] = {
+      hidden: patch.hidden !== undefined ? patch.hidden : cur.hidden,
+      pos: patch.pos || cur.pos
+    };
     setVal(PREF_KEY, prefs);
     applyPref();
   }
@@ -336,10 +337,47 @@
     badgeEl.classList.toggle("show", p.hidden);
   }
 
-  $("home").addEventListener("click", function () { location.href = HOME; });
-  $("move").addEventListener("click", function () {
-    setPref({ pos: myPref().pos === "top" ? "bottom" : "top" });
-  });
+  function runLength(id) {
+    var set = Object.create(null);
+    (state.done[id] || []).forEach(function (d) { set[d] = 1; });
+    (state.miss[id] || []).forEach(function (d) { set[d] = 1; });
+    var i = set[today()] ? 0 : (set[dayBack(1)] ? 1 : null);
+    if (i === null) return 0;
+    var n = 0;
+    while (set[dayBack(i)]) { n++; i++; }
+    return n;
+  }
+
+  function paint() {
+    var on  = (state.done[game.id] || []).indexOf(today()) !== -1;
+    var bad = (state.miss[game.id] || []).indexOf(today()) !== -1;
+
+    nextGame = null;
+    for (var k = 0; k < GAMES.length; k++) {
+      var c = GAMES[k];
+      if (c.id === game.id) continue;
+      if ((state.done[c.id] || []).indexOf(today()) === -1 &&
+          (state.miss[c.id] || []).indexOf(today()) === -1) { nextGame = c; break; }
+    }
+
+    var dep = 0;
+    IDS.forEach(function (id) { if ((state.done[id] || []).indexOf(today()) !== -1) dep++; });
+
+    nmEl.textContent = game.n;
+    var run = runLength(game.id);
+    stEl.className = "st " + (on ? "departed" : bad ? "cancelled" : "");
+    stEl.innerHTML = (on ? "DEPARTED" : bad ? "CANCELLED" : "ON TIME") +
+      '<span class="run">  \u00b7  ' + dep + " AWAY" +
+      (run ? "  \u00b7  " + run + "D RUN" : "") + "</span>";
+
+    goEl.classList.toggle("on", on);
+    noEl.classList.toggle("on", bad);
+    goEl.setAttribute("aria-pressed", on ? "true" : "false");
+    noEl.setAttribute("aria-pressed", bad ? "true" : "false");
+    nxEl.disabled = !nextGame;
+    nxEl.title = nextGame ? "Next: " + nextGame.n : "Board clear";
+  }
+
   function mark(kind) {
     var mine = state[kind][game.id],
         other = state[kind === "done" ? "miss" : "done"][game.id],
@@ -350,11 +388,18 @@
       if (j !== -1) other.splice(j, 1);
       if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) {}
     } else { mine.splice(i, 1); }
-    commit(); paint();
+    state.updatedAt = Date.now();
+    setVal(KEY, state);
+    paint();
   }
-  tickEl.addEventListener("click", function () { mark("done"); });
-  failEl.addEventListener("click", function () { mark("miss"); });
-  nextEl.addEventListener("click", function () { if (nextGame) location.href = nextGame.u; });
+
+  $("home").addEventListener("click", function () { location.href = HOME; });
+  goEl.addEventListener("click", function () { mark("done"); });
+  noEl.addEventListener("click", function () { mark("miss"); });
+  nxEl.addEventListener("click", function () { if (nextGame) location.href = nextGame.u; });
+  $("move").addEventListener("click", function () {
+    setPref({ pos: myPref().pos === "top" ? "bottom" : "top" });
+  });
   $("x").addEventListener("click", function () { setPref({ hidden: true }); });
   badgeEl.addEventListener("click", function () { setPref({ hidden: false }); });
 
@@ -365,7 +410,6 @@
     paint();
   });
 
-  /* pick up punches made in another tab */
   setInterval(function () {
     getVal(KEY, null).then(function (s) {
       if (!s) return;
